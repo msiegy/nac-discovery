@@ -198,15 +198,15 @@ def create_workbook():
             interfaces_ws.append(line)
 
             #Check for Exlcusion keywords and add switch and interfaces to portexclusion dictionary, append to portexlusion_ws later.
-            keyword = re.search('(ASR|ENCS|UPLINK|SWITCH|ESXI|VMWARE)', str(description), re.IGNORECASE)
+            keyword = re.search('(ASR|ENCS|UPLINK|SWITCH|TRUNK|ESXI|VMWARE)', str(description), re.IGNORECASE)
             if keyword:
-                #print('\nRE match >>>', keyword.group() )
-            #if re.search('ASR|ENCS', str(description), re.IGNORECASE):
+                #Different napalm getters return full interfaces name and some return shortened names which result in multiple dictionary keys being created.
+                #Improve logic handling here for any interface type, move to function...
                 if "TwoGigabit" in interface:
                     interface = "Tw" + interface[-5:]
                     reasondescript = 'Description contains: ' + keyword.group()
-                    portexclusions[host][interface]['reason'].append(reasondescript)
-                    portexclusions[host][interface]['description']= str(description)
+                portexclusions[host][interface]['reason'].append(reasondescript)
+                portexclusions[host][interface]['description']= str(description)
 
         print("Stop processing Host - Get Interfaces:", str(host), '\n')
 
