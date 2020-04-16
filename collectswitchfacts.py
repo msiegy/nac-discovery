@@ -6,6 +6,7 @@ from mac_vendor_lookup import MacLookup
 from collections import defaultdict
 import openpyxl
 from openpyxl.styles import Font
+import re
 
 
 def create_workbook():
@@ -14,7 +15,7 @@ def create_workbook():
     """
 
     wb = openpyxl.Workbook()
-    groupname = "MARSHAGroup" #TODO: Replace with function that takes list of location codes.
+    groupname = "MARSHGroup" #TODO: Replace with function that takes list of location codes.
     wb_name = "NACFACTS -" + groupname + ".xlsx"
 
 
@@ -45,6 +46,11 @@ def create_workbook():
     accessHosts = nr.filter(site='herndon-dev')
 
     #lldp_results = accessHosts.run(task=get_neighbors, name="Find LLDP Neighbors")
+
+
+    #Initialize nested dictionary for tracking recomended ports and reasoning to exclude from NAC.
+    portexclusions = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    #portexclusions = {'SwitchName': {'Gi1/1:' {'description': 'trunk to mdf', macvendor: 'VMWare', Reasoning: ['Port is trunk', 'multimacs'] }}
 
     """
     Get Mac Table results from all inventory targets using nornir napalm
@@ -99,6 +105,9 @@ def create_workbook():
                     line = [host, iface, len(interfaces[iface]), str(interfaces[iface])]
                     #print(line)
                     multimacports_ws.append(line)
+                    #Append to portexlcusions dictionary
+                    #portexclusions[host][iface]={'reason':[]}
+                    portexclusions[host][iface]['reason'].append('multimac')
             #print('vendor mactable\n\n', vendor_mactable)
             #print('interfact dict \n\n', interfaces)
             print("End Processing Host - Mac_Results: " + str(host) + "\n")
@@ -151,15 +160,19 @@ def create_workbook():
             remotesysdescription = lldp_detail[interface][0]['remote_system_description']
             remoteportid = lldp_detail[interface][0]['remote_port']
             remoteportdesc = lldp_detail[interface][0]['remote_port_description']
-            remotecapability = str(lldp_detail[interface][0]['remote_system_capab'])
+            remotecapability = lldp_detail[interface][0]['remote_system_capab']
             try:
                 remotevendor = macQ.lookup(remotesystemid)
             except:
                 remotevendor = "Unknown"
 
-            line = [host, interface, remotesysid, remotesysname, remotesysdescription, remoteportid, remoteportdesc, remotecapability, remotevendor]
+            line = [host, interface, remotesysid, remotesysname, remotesysdescription, remoteportid, remoteportdesc, str(remotecapability), remotevendor]
             #print(line)
             lldpneighbor_ws.append(line)
+
+            if 'router' or 'bridge' in remotecapability:
+                portexclusions[host][interface]['reason'].append('LLDP Neighbor' + str(remotecapability) )
+
         print("End Processing Host - Get LLDP Neighors: " + str(host) + "\n")
 
     """
@@ -183,6 +196,18 @@ def create_workbook():
             #print(line)
 
             interfaces_ws.append(line)
+
+            #Check for Exlcusion keywords and add switch and interfaces to portexclusion dictionary, append to portexlusion_ws later.
+            keyword = re.search('(ASR|ENCS|UPLINK|SWITCH|ESXI|VMWARE)', str(description), re.IGNORECASE)
+            if keyword:
+                #print('\nRE match >>>', keyword.group() )
+            #if re.search('ASR|ENCS', str(description), re.IGNORECASE):
+                if "TwoGigabit" in interface:
+                    interface = "Tw" + interface[-5:]
+                    reasondescript = 'Description contains: ' + keyword.group()
+                    portexclusions[host][interface]['reason'].append(reasondescript)
+                    portexclusions[host][interface]['description']= str(description)
+
         print("Stop processing Host - Get Interfaces:", str(host), '\n')
 
 
@@ -194,7 +219,12 @@ def create_workbook():
     #print_result(vlans)
 
     #portexclusions = mac_results['C9300-48-UXM-1'][0][1]
-    #print ('EXCLUSIONS', portexlusions)
+    print ('DEBUG EXCLUSIONS>>>> \n', portexclusions)
+
+    #for host, keys in portexclusions.items():
+        #print(host, '>', keys)
+    #portexclusions[host][iface]['reason'].append('LLDP router Neighbor')
+
     wb.remove(wb["Sheet"])
     wb.save(wb_name)
 
