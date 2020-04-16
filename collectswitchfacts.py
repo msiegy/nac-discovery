@@ -15,7 +15,7 @@ def create_workbook():
     """
 
     wb = openpyxl.Workbook()
-    groupname = "MARSHGroup" #TODO: Replace with function that takes list of location codes.
+    groupname = "MARSGrouping" #TODO: Replace with function that takes list of location codes.
     wb_name = "NACFACTS -" + groupname + ".xlsx"
 
 
@@ -36,7 +36,7 @@ def create_workbook():
     multimacports_ws.append(['Switch', 'Interface', 'Count', 'Vendor MACs'])
 
     portexclusions_ws = wb.create_sheet("Port Exclusion Recommendations")
-    portexclusions_ws.append(['Switch', 'Interface', 'Description', 'Switchport Mode', 'MAC OUI Vendor', 'MACaddr', 'Reason'])
+    portexclusions_ws.append(['Switch', 'Interface', 'Reason', 'port description'])
 
     """
     Initialize Nornir settings and set the right inventory targets and filters
@@ -204,13 +204,21 @@ def create_workbook():
                 #Improve logic handling here for any interface type, move to function...
                 if "TwoGigabit" in interface:
                     interface = "Tw" + interface[-5:]
-                    reasondescript = 'Description contains: ' + keyword.group()
+                reasondescript = 'Description contains: ' + keyword.group()
                 portexclusions[host][interface]['reason'].append(reasondescript)
                 portexclusions[host][interface]['description']= str(description)
 
         print("Stop processing Host - Get Interfaces:", str(host), '\n')
 
 
+    for host, value in portexclusions.items():
+        print("Start processing Host - Port Exclusions:", str(host), '\n')
+        #print(host)
+        for interface in portexclusions[host]:
+            #print(host, interface, portexclusions[host][interface]['reason'], portexclusions[host][interface]['description'])
+            line = [host, interface, str(portexclusions[host][interface]['reason']), str(portexclusions[host][interface]['description'])]
+            portexclusions_ws.append(line)
+        print("Stop processing Host - Port Exclusions:", str(host), '\n')
     """
     Get VLANs... in Napalm-automation:develop train, needed for identifying switchport mode trunk.
     """
@@ -219,7 +227,7 @@ def create_workbook():
     #print_result(vlans)
 
     #portexclusions = mac_results['C9300-48-UXM-1'][0][1]
-    print ('DEBUG EXCLUSIONS>>>> \n', portexclusions)
+    #print ('DEBUG EXCLUSIONS>>>> \n', portexclusions)
 
     #for host, keys in portexclusions.items():
         #print(host, '>', keys)
