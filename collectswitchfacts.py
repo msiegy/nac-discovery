@@ -99,7 +99,7 @@ def create_workbook():
             print("End Processing Host - Mac_Results: " + str(host) + "\n")
 
     """
-    Run Get_Facts for from all inventory targets using nornir napalm
+    Get Facts  from all inventory targets using nornir napalm
     task=get_facts and output results to facts_ws
     """
 
@@ -125,7 +125,8 @@ def create_workbook():
 
 
     """
-    Run get_lldp_neighbors for all invetnory targets using nornir napalm task=get_lldp_neighbors
+    get_lldp_neighbors for all invetnory targets using nornir napalm task=get_lldp_neighbors,
+    perform mac vendoroui lookup on chassisid and output all results to lldpneighbors_ws
     """
 
     lldpneighbors = accessHosts.run(task=get_lldp_neighbors, name="Get LLDP Neighbors")
