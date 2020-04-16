@@ -68,7 +68,7 @@ def create_workbook():
                 try:
                     vendor = macQ.lookup(entry['mac'])
                 except:
-                    vendor = "Unknown - " + entry['mac']
+                    vendor = "Unknown"
 
                 #print(entry['mac'], 'EQUALS > ', vendor, 'ON INTERFACE > ', entry['interface'])
                 #vendor_mactable[entry['interface']].append(vendor)
@@ -155,7 +155,7 @@ def create_workbook():
             line = [host, interface, remotesysid, remotesysname, remotesysdescription, remoteportid, remoteportdesc, remotecapability, remotevendor]
             #print(line)
             lldpneighbor_ws.append(line)
-    print("End Processing Host - Get LLDP Neighors: " + str(host) + "\n")
+        print("End Processing Host - Get LLDP Neighors: " + str(host) + "\n")
 
     """
     Get Interfaces... May not be necessary, has Up/Down info, but need VLANs
@@ -194,7 +194,7 @@ def get_mac_table(task):
         try:
             vendor = macQ.lookup(key['mac'])
         except:
-            vendor = "Unknown - " + key['mac']
+            vendor = "Unknown"
 
         #print(key['mac'], 'EQUALS > ', vendor, 'ON INTERFACE > ', key['interface'])
         vendor_mactable[key['interface']].append(vendor)
