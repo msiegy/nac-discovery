@@ -2,3 +2,4 @@ mac-vendor-lookup
 napalm
 nornir
 openpyxl
+ciscoconfparse
