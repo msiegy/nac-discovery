@@ -5,6 +5,7 @@ from nornir.plugins.functions.text import print_result
 from mac_vendor_lookup import MacLookup
 from collections import defaultdict
 import openpyxl
+from openpyxl.styles import Font
 
 
 def create_workbook():
@@ -16,9 +17,13 @@ def create_workbook():
     groupname = "MARSHAGroup" #TODO: Replace with function that takes list of location codes.
     wb_name = "NACFACTS -" + groupname + ".xlsx"
 
+
     #Create sheets and column headers
     facts_ws = wb.create_sheet("Facts")
     facts_ws.append(['Switch Hostname','Vendor','Model','OS Version','Serial Number','Uptime'])
+
+    interfaces_ws = wb.create_sheet("Interfaces")
+    interfaces_ws.append(['Switch', 'Interface name', 'Description', 'Admin Status', 'Oper Status', 'Speed'])
 
     mactablevendor_ws = wb.create_sheet("Mac Table Vendors")
     mactablevendor_ws.append(['Switch', 'Interface', 'MACaddr', 'Vendor OUI'])
@@ -158,10 +163,28 @@ def create_workbook():
         print("End Processing Host - Get LLDP Neighors: " + str(host) + "\n")
 
     """
-    Get Interfaces... May not be necessary, has Up/Down info, but need VLANs
+    Get Interfaces... May not be necessary, has description, Up/Down info, but need VLANs
     """
-    #getinterfaces = accessHosts.run(task=get_interfaces, name="Get Interfaces")
-    #print_result(getinterfaces)
+    getinterfaces = accessHosts.run(task=get_interfaces, name="Get Interfaces")
+
+    for host, task_results in getinterfaces.items():
+        print("Start processing Host - Get Interfaces:", str(host), '\n')
+
+        interfaces_result = task_results[1].result
+        interfaces_result = interfaces_result['interfaces']
+        for interface in interfaces_result:
+            interface_id = interface
+            adminstatus = interfaces_result[interface]['is_enabled']
+            operstatus = interfaces_result[interface]['is_up']
+            description = interfaces_result[interface]['description']
+            speed = interfaces_result[interface]['speed']
+
+            line = [host, interface_id, description, adminstatus, operstatus, speed]
+            #print(line)
+
+            interfaces_ws.append(line)
+        print("Stop processing Host - Get Interfaces:", str(host), '\n')
+
 
     """
     Get VLANs... in Napalm-automation:develop train, needed for identifying switchport mode trunk.
