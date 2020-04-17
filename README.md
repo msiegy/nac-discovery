@@ -4,3 +4,5 @@ A discovery and collection tool which pulls information from an inventory of swi
 Ideally inventory files should be built dynamically using input from external sources and network tools like NETMRI, DNA Center, SolarWinds etc.
 
 Built using the opensource Nornir and Napalm Python libraries.
+
+*Local modification of mac_vendor_lookup required to handle cisco MAC formatting*
