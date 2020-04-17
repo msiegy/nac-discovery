@@ -1,3 +1,13 @@
+"""
+    A discovery and collection tool which pulls information from switches and
+    provides useful data points and recommendations on which ports
+    to apply or exclude 802.1x NAC configurations. Information is exported to an
+    Excel workbook.
+
+    Currently Recommendations based on based on LLDP Vendorlookup, RemoteCapability,
+    Description keywords, and multiple macs present on port.
+"""
+
 from nornir import InitNornir
 from nornir.plugins.tasks import networking
 from nornir.plugins.tasks.networking import napalm_get
@@ -7,7 +17,6 @@ from collections import defaultdict
 import openpyxl
 from openpyxl.styles import Font
 import re
-
 
 def create_workbook():
     """
@@ -44,9 +53,6 @@ def create_workbook():
     nr = InitNornir(config_file="config.yaml")
     #accessHosts = nr.filter(hostname='10.83.8.163')
     accessHosts = nr.filter(site='herndon-dev')
-
-    #lldp_results = accessHosts.run(task=get_neighbors, name="Find LLDP Neighbors")
-
 
     #Initialize nested dictionary for tracking recomended ports and reasoning to exclude from NAC.
     portexclusions = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
@@ -87,7 +93,6 @@ def create_workbook():
                 vendor_value = vendor
                 mac_value = entry['mac']
 
-
                 #Store relevant values for worksheet row
                 line = [host, interface_value, mac_value, vendor_value]
                 #print(line)
@@ -106,7 +111,6 @@ def create_workbook():
                     #print(line)
                     multimacports_ws.append(line)
                     #Append to portexlcusions dictionary
-                    #portexclusions[host][iface]={'reason':[]}
                     portexclusions[host][iface]['reason'].append('multimac')
             #print('vendor mactable\n\n', vendor_mactable)
             #print('interfact dict \n\n', interfaces)
@@ -116,7 +120,6 @@ def create_workbook():
     Get Facts  from all inventory targets using nornir napalm
     task=get_facts and output results to facts_ws
     """
-
 
     facts = accessHosts.run(task=get_facts, name="Get Facts")
 
@@ -135,8 +138,6 @@ def create_workbook():
 
         facts_ws.append(line)
         print("End Processing Host - Get Facts: " + str(host) + "\n")
-
-
 
     """
     get_lldp_neighbors for all invetnory targets using nornir napalm task=get_lldp_neighbors,
@@ -198,7 +199,7 @@ def create_workbook():
             interfaces_ws.append(line)
 
             #Check for Exlcusion keywords and add switch and interfaces to portexclusion dictionary, append to portexlusion_ws later.
-            keyword = re.search('(ASR|ENCS|UPLINK|SWITCH|TRUNK|ESXI|VMWARE)', str(description), re.IGNORECASE)
+            keyword = re.search('(ASR|ENCS|UPLINK|CIRCUIT|ISP|SWITCH|TRUNK|ESXI|VMWARE)', str(description), re.IGNORECASE)
             if keyword:
                 #Different napalm getters return full interfaces name and some return shortened names which result in multiple dictionary keys being created.
                 #Improve logic handling here for any interface type, move to function...
@@ -208,9 +209,12 @@ def create_workbook():
                 portexclusions[host][interface]['reason'].append(reasondescript)
                 portexclusions[host][interface]['description']= str(description)
 
-        print("Stop processing Host - Get Interfaces:", str(host), '\n')
+        print("End processing Host - Get Interfaces:", str(host), '\n')
 
-
+    """
+    Export all entries from portexlusions dictionary to portexclusions_ws
+    so that port exclusion recommendations show up in the workbook.
+    """
     for host, value in portexclusions.items():
         print("Start processing Host - Port Exclusions:", str(host), '\n')
         #print(host)
@@ -218,7 +222,8 @@ def create_workbook():
             #print(host, interface, portexclusions[host][interface]['reason'], portexclusions[host][interface]['description'])
             line = [host, interface, str(portexclusions[host][interface]['reason']), str(portexclusions[host][interface]['description'])]
             portexclusions_ws.append(line)
-        print("Stop processing Host - Port Exclusions:", str(host), '\n')
+        print("End processing Host - Port Exclusions:", str(host), '\n')
+
     """
     Get VLANs... in Napalm-automation:develop train, needed for identifying switchport mode trunk.
     """
@@ -236,6 +241,7 @@ def create_workbook():
     wb.remove(wb["Sheet"])
     wb.save(wb_name)
 
+""" DELETE
 def get_mac_table(task):
     r = task.run(networking.napalm_get, getters=['mac_address_table'], name="Get MAC Table")
     macQ = MacLookup()
@@ -276,8 +282,8 @@ def get_mac_table(task):
     #return task.host['exlcusions'][vendor_mactable, interfaces]
     info = {'multimacports': dict(interfaces), 'vendormactable': dict(vendor_mactable)}
     return info
-
 """
+""" DELETE
 def get_interfaces(task):
     r = task.run(networking.napalm_get, getters=['interfaces'], name="Get Interfaces")
     # save our values in to the Key 'neighbors'
@@ -286,6 +292,7 @@ def get_interfaces(task):
     print(task.host['interfaces'])
     #print('-'*10, task.host, '-', task.host.hostname, '-'*10)
 """
+
 def get_mac_table_napalm(task):
     task.run(name="Get Mac Table Napalm", task=napalm_get, getters=["mac_address_table"])
     return "Get Mac Table Complete"
@@ -306,4 +313,7 @@ def get_vlans(task):
     task.run(name="Get VLANs", task=napalm_get, getters=["vlans"])
     return "get VLANs Complete"
 
+"""
+Run the main function to pull device information and create the workbook.
+"""
 create_workbook()
