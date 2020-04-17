@@ -14,4 +14,4 @@ A Separate project which uses a switch configuration file parser and the python 
 iosparser.py """ Iterates Cisco IOS configuration files in a directory to return a list of interfaces that contain relevant children statements. From this list generate configuration files that include NAC changes. One file for complete configuration and one file for new changes only. Today the script considers the following: Switchport mode access, shutdown status and description keywords as whether to apply NAC commands."""
 
 
-Both scrips were tested with Catalyst 9300/500 switches running 16.6 and 16.8, but should run on most ios versions.
+Both scrips were tested with Catalyst 9300/9500 switches running 16.6 and 16.8, but should run on most ios versions.
