@@ -5,4 +5,4 @@ Ideally inventory files should be built dynamically using input from external so
 
 Built using the opensource Nornir and Napalm Python libraries.
 
-*Local modification of mac_vendor_lookup library required to handle cisco MAC formatting*
+*Local modification of mac_vendor_lookup library required to handle cisco MAC formatting. PR planned*
