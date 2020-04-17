@@ -8,7 +8,7 @@ Built using the opensource Nornir and Napalm Python libraries. Nornir inventory 
 *Local modification of mac_vendor_lookup library required to handle cisco MAC formatting. PR planned*
 
 
-# iosparser.py
+# iosnacconfparser.py
 A Separate project which uses a switch configuration file parser and the python library ciscoconfparse for identifying where to apply appropriate NAC configs and then generates those configs for deployment. 
 
 iosparser.py """ Iterates Cisco IOS configuration files in a directory to return a list of interfaces that contain relevant children statements. From this list generate configuration files that include NAC changes. One file for complete configuration and one file for new changes only. Today the script considers the following: Switchport mode access, shutdown status and description keywords as whether to apply NAC commands."""
