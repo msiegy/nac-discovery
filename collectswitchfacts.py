@@ -9,6 +9,8 @@
 """
 
 from nornir import InitNornir
+from nornir.core.exceptions import NornirExecutionError
+from nornir.core.exceptions import NornirSubTaskError
 from nornir.plugins.tasks import networking
 from nornir.plugins.tasks.networking import napalm_get
 from nornir.plugins.functions.text import print_result
@@ -24,7 +26,7 @@ def create_workbook():
     """
 
     wb = openpyxl.Workbook()
-    groupname = "MARSGrouping" #TODO: Replace with function that takes list of location codes.
+    groupname = "failedGrouping" #TODO: Replace with function that takes list of location codes.
     wb_name = "NACFACTS -" + groupname + ".xlsx"
 
 
@@ -50,9 +52,11 @@ def create_workbook():
     """
     Initialize Nornir settings and set the right inventory targets and filters
     """
-    nr = InitNornir(config_file="config.yaml")
+    nr = InitNornir(config_file="config.yaml", core={"raise_on_error": False})
     #accessHosts = nr.filter(hostname='10.83.8.163')
-    accessHosts = nr.filter(site='herndon-dev')
+    #accessHosts = nr.filter(site='herndon-dev')
+    #accessHosts = nr.filter(type='network_device')
+    accessHosts = nr.filter(role='FIAB')
 
     #Initialize nested dictionary for tracking recomended ports and reasoning to exclude from NAC.
     portexclusions = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
@@ -62,67 +66,108 @@ def create_workbook():
     Get Mac Table results from all inventory targets using nornir napalm
     task=get_mac_table_napalm, lookup Vendor MACOUI and store in mactablevendor_ws
     """
+    #mac_results = accessHosts.run(task=get_mac_table_napalm, name="Get MAC Table")
+    #print('Print hosts before .run\n', nr.inventory)
+    #print(len(accessHosts))
+    print('nornir inventory accesshosts keys:>', accessHosts.inventory.hosts.keys())
+    #try:
+    mac_results = accessHosts.run(task=napalm_get, getters=['mac_address_table'])
+    print('print lenght of macresults ', len(mac_results))
+    print('MAC RESULTS>', mac_results)
+    #except Exception as e:
+#        print('ERROR!!!\n\n', e)
+#        print(e)
 
-    mac_results = accessHosts.run(task=get_mac_table_napalm, name="Get MAC Table")
-
+    #print('MAC RESULTS OUTPUT >>\n', mac_results)
+    #print_result(mac_results)
     macQ = MacLookup()
-    vendor_mactable = defaultdict(list)
-    interfaces = defaultdict(list)
-    multimacinterfaces = defaultdict(dict)
-
-    #loop through each host's results
+    #print('Pre Loop, print results from run task:\n', mac_results)
+    #print('Pre Loop, print_results\n', print_result(mac_results))
+    #loop through each switch in the Nornir Task Result object
     for host, task_results in mac_results.items():
         print("Start processing Host - Mac_Results:", str(host), '\n')
-        mac_results_host =  task_results[1].result
+        #Check for switches that failed and pass... TODO: Log failures for further review.
+        if task_results.failed:
+            print('Failed Host in task_results:>', host)
+            continue
+        #Return the actual serialized mac table dict for the current switch
+        mac_results_host =  task_results[0].result
+
+        vendor_mactable = defaultdict(list)
+        interfaces = defaultdict(list)
+        multimacinterfaces = defaultdict(dict)
+        #print(mac_results_host)
+        #print('Enter loop: for host, task results in mac_Results.items() loop... Print mac_results_host\n', mac_results_host)
         #Loop through each Host's MAC Table and Create dictionary of interfaces and the vendor MACs that are attached.
-        for hosttable in mac_results_host:
-            #print(mac_results_host[key])
-            #Loop through the list of Mac Table Entries and create a dictionary of interfaces and Lookup the vendor MACs that are attached.
-            for entry in mac_results_host[hosttable]:
-                #print(entry)
-                if not entry['interface']:  #skip mac address not assigned to interfaces
-                    continue
-                try:
-                    vendor = macQ.lookup(entry['mac'])
-                except:
-                    vendor = "Unknown"
 
-                #print(entry['mac'], 'EQUALS > ', vendor, 'ON INTERFACE > ', entry['interface'])
-                #vendor_mactable[entry['interface']].append(vendor)
-                interface_value = entry['interface']
-                vendor_value = vendor
-                mac_value = entry['mac']
+        #print('Entered MAC Results table loop. Print mac_results_host object\n', mac_results_host)
+        #Loop through the list of Mac Table Entries and create a dictionary of interfaces and Lookup the vendor MACs that are attached.
+        #print('Print current Hosttable loop object\n', hosttable)
+        #print(mac_results_host)
+        for entry in mac_results_host['mac_address_table']:
+            #print(entry)
+            if not entry['interface']:  #skip mac address not assigned to interfaces
+                continue
+            try:
+                vendor = macQ.lookup(entry['mac'])
+            except:
+                vendor = "Unknown"
 
-                #Store relevant values for worksheet row
-                line = [host, interface_value, mac_value, vendor_value]
+            #print(entry['mac'], 'EQUALS > ', vendor, 'ON INTERFACE > ', entry['interface'])
+            #vendor_mactable[entry['interface']].append(vendor)
+            interface_value = entry['interface']
+            vendor_value = vendor
+            mac_value = entry['mac']
+
+            #Store relevant values for worksheet row
+            line = [host, interface_value, mac_value, vendor_value]
+            #print(line)
+            mactablevendor_ws.append(line)
+            #
+            vendor_mactable[entry['interface']].append(vendor_value)
+
+        #build dictionary of interfaces containing lists of vendors and identify ports with multiple MACs.
+        for iface, value in vendor_mactable.items():
+            #print(iface, value)
+            if len(value) > 1:
+                #print(iface, '>', value)
+                interfaces[iface].extend(value)
+
+                line = [host, iface, len(interfaces[iface]), str(interfaces[iface])]
                 #print(line)
-                mactablevendor_ws.append(line)
-                #print("End Processing Host - Mac_Results: " + str(host) + "\n")
-                vendor_mactable[entry['interface']].append(vendor_value)
-
-            #build dictionary of interfaces containing lists of vendors and identify ports with multiple MACs.
-            for iface, value in vendor_mactable.items():
-                #print(iface, value)
-                if len(value) > 1:
-                    #print(iface, '>', value)
-                    interfaces[iface].extend(value)
-
-                    line = [host, iface, len(interfaces[iface]), str(interfaces[iface])]
-                    #print(line)
-                    multimacports_ws.append(line)
-                    #Append to portexlcusions dictionary
-                    portexclusions[host][iface]['reason'].append('multimac')
-            #print('vendor mactable\n\n', vendor_mactable)
-            #print('interfact dict \n\n', interfaces)
-            print("End Processing Host - Mac_Results: " + str(host) + "\n")
-
+                multimacports_ws.append(line)
+                #Append to portexlcusions dictionary
+                portexclusions[host][iface]['reason'].append('multimac')
+        #print('vendor mactable\n\n', vendor_mactable)
+        #print('interfact dict \n\n', interfaces)
+        print("End Processing Host - Mac_Results: " + str(host) + "\n")
+    #exit()
     """
     Get Facts  from all inventory targets using nornir napalm
     task=get_facts and output results to facts_ws
     """
-
     facts = accessHosts.run(task=get_facts, name="Get Facts")
+    print('nornir inventory accesshosts keys:>', accessHosts.inventory.hosts.keys())
+    print('print lenght of FACTS ', len(facts))
+    print('FACTS>', facts)
 
+    #print(facts.items())
+
+    """
+    Loop through this below.... Each Device has amultiresult dictionary with list of dictionarys.
+    dict_items([('C9300-DNA-A-24', MultiResult: [Result: "Get Facts", Result: "Get facts"]), ('C9300-48-HXEdge', MultiResult: [Result: "Get Facts", Result: "Get facts"]), ('C9300-48-UXM-1', MultiResult: [Result: "Get Facts", Result: "Get facts"]), ('C9500-16X', MultiResult: [Result: "Get Facts", Result: "Get facts"])])
+
+    C9300-DNA-A-24
+    C9300-48-HXEdge
+    C9300-48-UXM-1
+    C9500-16X
+
+    """
+    """
+    for dev in facts:
+        print(dev)
+        #model = facts[dev].result['facts']['model']
+    """
     #Loop through each host's task results and store values to append lines to facts_ws
     for host, task_results in facts.items():
         print("Start processing Host - Get Facts:", str(host), '\n')
@@ -187,6 +232,8 @@ def create_workbook():
         interfaces_result = task_results[1].result
         interfaces_result = interfaces_result['interfaces']
         for interface in interfaces_result:
+            #if 'C9500-16X' in host:
+                #print(interface_id)
             interface_id = interface
             adminstatus = interfaces_result[interface]['is_enabled']
             operstatus = interfaces_result[interface]['is_up']
@@ -240,6 +287,7 @@ def create_workbook():
 
     wb.remove(wb["Sheet"])
     wb.save(wb_name)
+
 
 """ DELETE
 def get_mac_table(task):
@@ -317,3 +365,4 @@ def get_vlans(task):
 Run the main function to pull device information and create the workbook.
 """
 create_workbook()
+print("Workbook Created")
