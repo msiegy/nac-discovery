@@ -26,7 +26,7 @@ def create_workbook():
     """
 
     wb = openpyxl.Workbook()
-    groupname = "Grouping" #TODO: Replace with function that takes list of location codes.
+    groupname = "Grouping1" #TODO: Replace with function that takes list of location codes.
     wb_name = "NACFACTS -" + groupname + ".xlsx"
 
 
@@ -181,8 +181,17 @@ def create_workbook():
             #print(line)
             lldpneighbor_ws.append(line)
 
-            if 'router' or 'bridge' in remotecapability:
-                portexclusions[host][interface]['reason'].append('LLDP Neighbor' + str(remotecapability) )
+            if ('router' in remotecapability) or ('bridge' in remotecapability):
+                #TODO: generalize for all interfaces and move to function
+                if re.search('TenGigabit', str(interface), re.IGNORECASE):
+                    digits = re.search('([0-9]*\/?[0-9]*\/?[0-9]*$)', str(interface))
+                    interface = 'Te' + digits.group()
+                elif re.search('TwoGigabit', str(interface), re.IGNORECASE):
+                    digits = re.search('([0-9]*\/?[0-9]*\/?[0-9]*$)', str(interface))
+                    interface = 'Tw' + digits.group()
+
+                portexclusions[host][interface]['reason'].append('LLDP Neighbor' + str(remotecapability))
+                #print(host, interface, remotecapability)
 
         print("End Processing Host - Get LLDP Neighors: " + str(host) + "\n")
 
@@ -211,12 +220,18 @@ def create_workbook():
             interfaces_ws.append(line)
 
             #Check for Exclusion keywords and add interfaces to portexclusion dictionary then append to portexlusion_ws.
+            #TODO: Replace search literals with variable at top for quicker modification.
             keyword = re.search('(ASR|ENCS|UPLINK|CIRCUIT|ISP|SWITCH|TRUNK|ESXI|VMWARE)', str(description), re.IGNORECASE)
             if keyword:
-                #Different napalm getters return full interfaces name and some return shortened names which result in multiple dictionary keys being created.
-                #Improve logic handling here for any interface type, move to function...
-                if "TwoGigabit" in interface:
-                    interface = "Tw" + interface[-5:]
+                #Normalize Interface names because different napalm getters return full interfaces name and some return shortened names which result in multiple dictionary keys being created.
+                #TODO: generalize for all interfaces and move to function
+                if re.search('TenGigabit', str(interface), re.IGNORECASE):
+                    digits = re.search('([0-9]*\/?[0-9]*\/?[0-9]*$)', str(interface))
+                    interface = 'Te' + digits.group()
+                elif re.search('TwoGigabit', str(interface), re.IGNORECASE):
+                    digits = re.search('([0-9]*\/?[0-9]*\/?[0-9]*$)', str(interface))
+                    interface = 'Tw' + digits.group()
+
                 reasondescript = 'Description contains: ' + keyword.group()
                 portexclusions[host][interface]['reason'].append(reasondescript)
                 portexclusions[host][interface]['description']= str(description)
@@ -243,7 +258,7 @@ def create_workbook():
     #print_result(vlans)
 
     if nr.data.failed_hosts:
-        print("The following switches failed processing and were not added to the workbook:", nr.data.failed_hosts)
+        print("The following switches failed during a task and were not added to the workbook:", nr.data.failed_hosts)
 
     wb.remove(wb["Sheet"])
     wb.save(wb_name)
