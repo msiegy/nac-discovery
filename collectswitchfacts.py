@@ -26,7 +26,7 @@ def create_workbook():
     """
 
     wb = openpyxl.Workbook()
-    groupname = "failedGrouping" #TODO: Replace with function that takes list of location codes.
+    groupname = "Grouping" #TODO: Replace with function that takes list of location codes.
     wb_name = "NACFACTS -" + groupname + ".xlsx"
 
 
@@ -54,9 +54,9 @@ def create_workbook():
     """
     nr = InitNornir(config_file="config.yaml", core={"raise_on_error": False})
     #accessHosts = nr.filter(hostname='10.83.8.163')
-    #accessHosts = nr.filter(site='herndon-dev')
+    accessHosts = nr.filter(site='herndon-dev')
     #accessHosts = nr.filter(type='network_device')
-    accessHosts = nr.filter(role='FIAB')
+    #accessHosts = nr.filter(role='FIAB')
 
     #Initialize nested dictionary for tracking recomended ports and reasoning to exclude from NAC.
     portexclusions = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
@@ -64,48 +64,34 @@ def create_workbook():
 
     """
     Get Mac Table results from all inventory targets using nornir napalm
-    task=get_mac_table_napalm, lookup Vendor MACOUI and store in mactablevendor_ws
+    task=get_mac_table, lookup Vendor MACOUI and store in mactablevendor_ws
     """
     #mac_results = accessHosts.run(task=get_mac_table_napalm, name="Get MAC Table")
     #print('Print hosts before .run\n', nr.inventory)
     #print(len(accessHosts))
-    print('nornir inventory accesshosts keys:>', accessHosts.inventory.hosts.keys())
+    print('Collecting information from the following Nornir inventory hosts:', accessHosts.inventory.hosts.keys())
     #try:
     mac_results = accessHosts.run(task=napalm_get, getters=['mac_address_table'])
-    print('print lenght of macresults ', len(mac_results))
-    print('MAC RESULTS>', mac_results)
     #except Exception as e:
-#        print('ERROR!!!\n\n', e)
-#        print(e)
+        #print('ERROR!!!\n\n', e)
 
-    #print('MAC RESULTS OUTPUT >>\n', mac_results)
-    #print_result(mac_results)
     macQ = MacLookup()
-    #print('Pre Loop, print results from run task:\n', mac_results)
-    #print('Pre Loop, print_results\n', print_result(mac_results))
     #loop through each switch in the Nornir Task Result object
     for host, task_results in mac_results.items():
         print("Start processing Host - Mac_Results:", str(host), '\n')
-        #Check for switches that failed and pass... TODO: Log failures for further review.
+        #Check for switches that failed and pass. Nornir automatically removes failed devices from future tasks.
+        #TODO: Log or print failures for further review.
         if task_results.failed:
-            print('Failed Host in task_results:>', host)
+            print(' ######', '\n!Failed Host in task_results:>', host, 'will be removed from future tasks!\n', '######', '\n')
             continue
-        #Return the actual serialized mac table dict for the current switch
+        #Store the actual serialized mac table dict for the current switch
         mac_results_host =  task_results[0].result
 
         vendor_mactable = defaultdict(list)
         interfaces = defaultdict(list)
         multimacinterfaces = defaultdict(dict)
-        #print(mac_results_host)
-        #print('Enter loop: for host, task results in mac_Results.items() loop... Print mac_results_host\n', mac_results_host)
         #Loop through each Host's MAC Table and Create dictionary of interfaces and the vendor MACs that are attached.
-
-        #print('Entered MAC Results table loop. Print mac_results_host object\n', mac_results_host)
-        #Loop through the list of Mac Table Entries and create a dictionary of interfaces and Lookup the vendor MACs that are attached.
-        #print('Print current Hosttable loop object\n', hosttable)
-        #print(mac_results_host)
         for entry in mac_results_host['mac_address_table']:
-            #print(entry)
             if not entry['interface']:  #skip mac address not assigned to interfaces
                 continue
             try:
@@ -113,17 +99,14 @@ def create_workbook():
             except:
                 vendor = "Unknown"
 
-            #print(entry['mac'], 'EQUALS > ', vendor, 'ON INTERFACE > ', entry['interface'])
-            #vendor_mactable[entry['interface']].append(vendor)
             interface_value = entry['interface']
             vendor_value = vendor
             mac_value = entry['mac']
 
-            #Store relevant values for worksheet row
+            #Store relevant values for worksheet row and append to sheet.
             line = [host, interface_value, mac_value, vendor_value]
-            #print(line)
             mactablevendor_ws.append(line)
-            #
+            #Append Vendor lookup results to vendor_mactable so we can use them for port exclusion recommendations.
             vendor_mactable[entry['interface']].append(vendor_value)
 
         #build dictionary of interfaces containing lists of vendors and identify ports with multiple MACs.
@@ -146,32 +129,14 @@ def create_workbook():
     Get Facts  from all inventory targets using nornir napalm
     task=get_facts and output results to facts_ws
     """
-    facts = accessHosts.run(task=get_facts, name="Get Facts")
-    print('nornir inventory accesshosts keys:>', accessHosts.inventory.hosts.keys())
-    print('print lenght of FACTS ', len(facts))
-    print('FACTS>', facts)
+    facts = accessHosts.run(task=napalm_get, getters=["facts"])
+    #print('Check nornir inventory after potential failure > accesshosts keys:>', accessHosts.inventory.hosts.keys())
 
-    #print(facts.items())
-
-    """
-    Loop through this below.... Each Device has amultiresult dictionary with list of dictionarys.
-    dict_items([('C9300-DNA-A-24', MultiResult: [Result: "Get Facts", Result: "Get facts"]), ('C9300-48-HXEdge', MultiResult: [Result: "Get Facts", Result: "Get facts"]), ('C9300-48-UXM-1', MultiResult: [Result: "Get Facts", Result: "Get facts"]), ('C9500-16X', MultiResult: [Result: "Get Facts", Result: "Get facts"])])
-
-    C9300-DNA-A-24
-    C9300-48-HXEdge
-    C9300-48-UXM-1
-    C9500-16X
-
-    """
-    """
-    for dev in facts:
-        print(dev)
-        #model = facts[dev].result['facts']['model']
-    """
     #Loop through each host's task results and store values to append lines to facts_ws
+    #AggregatedResult (napalm_get): {'C9300-48-UXM-1': MultiResult: [Result: "napalm_get"], 'C9500-16X': MultiResult: [Result: "napalm_get"]}
     for host, task_results in facts.items():
         print("Start processing Host - Get Facts:", str(host), '\n')
-        facts_result =  task_results[1].result
+        facts_result =  task_results[0].result
 
         vendor_result = facts_result['facts']['vendor']
         model_result = facts_result['facts']['model']
@@ -189,12 +154,12 @@ def create_workbook():
     perform mac vendoroui lookup on chassisid and output all results to lldpneighbors_ws
     """
 
-    lldpneighbors = accessHosts.run(task=get_lldp_neighbors, name="Get LLDP Neighbors")
+    lldpneighbors = accessHosts.run(task=napalm_get, getters=["lldp_neighbors_detail"])
 
     for host, task_results in lldpneighbors.items():
         print("Start processing Host - Get LLDP Neighbors:", str(host), '\n')
         #Store results from Nornir aggregated result object
-        lldp_result =  task_results[1].result
+        lldp_result =  task_results[0].result
         #store actual result dicitonary from the Nornir result object.
         lldp_detail = lldp_result['lldp_neighbors_detail']
 
@@ -222,14 +187,14 @@ def create_workbook():
         print("End Processing Host - Get LLDP Neighors: " + str(host) + "\n")
 
     """
-    Get Interfaces... May not be necessary, has description, Up/Down info, but need VLANs
+    Get Interfaces, check descriptions for keywords and append to port exclusions.
     """
-    getinterfaces = accessHosts.run(task=get_interfaces, name="Get Interfaces")
+    getinterfaces = accessHosts.run(task=napalm_get, getters=["interfaces"])
 
     for host, task_results in getinterfaces.items():
         print("Start processing Host - Get Interfaces:", str(host), '\n')
 
-        interfaces_result = task_results[1].result
+        interfaces_result = task_results[0].result
         interfaces_result = interfaces_result['interfaces']
         for interface in interfaces_result:
             #if 'C9500-16X' in host:
@@ -245,7 +210,7 @@ def create_workbook():
 
             interfaces_ws.append(line)
 
-            #Check for Exlcusion keywords and add switch and interfaces to portexclusion dictionary, append to portexlusion_ws later.
+            #Check for Exclusion keywords and add interfaces to portexclusion dictionary then append to portexlusion_ws.
             keyword = re.search('(ASR|ENCS|UPLINK|CIRCUIT|ISP|SWITCH|TRUNK|ESXI|VMWARE)', str(description), re.IGNORECASE)
             if keyword:
                 #Different napalm getters return full interfaces name and some return shortened names which result in multiple dictionary keys being created.
@@ -274,95 +239,17 @@ def create_workbook():
     """
     Get VLANs... in Napalm-automation:develop train, needed for identifying switchport mode trunk.
     """
-
     #vlans = accessHosts.run(task=get_vlans, name="Get VLANs")
     #print_result(vlans)
 
-    #portexclusions = mac_results['C9300-48-UXM-1'][0][1]
-    #print ('DEBUG EXCLUSIONS>>>> \n', portexclusions)
-
-    #for host, keys in portexclusions.items():
-        #print(host, '>', keys)
-    #portexclusions[host][iface]['reason'].append('LLDP router Neighbor')
+    if nr.data.failed_hosts:
+        print("The following switches failed processing and were not added to the workbook:", nr.data.failed_hosts)
 
     wb.remove(wb["Sheet"])
     wb.save(wb_name)
-
-
-""" DELETE
-def get_mac_table(task):
-    r = task.run(networking.napalm_get, getters=['mac_address_table'], name="Get MAC Table")
-    macQ = MacLookup()
-
-    print('-'*10, task.host, '-', task.host.hostname, '- MultiMAC Interfaces','-'*10)
-    #transform MAC address table into a new dictionary of interfaces with a list of associated MACs per interface. Only Keep multi mac interfaces
-    #task.host['MultiMacports'] = multimacports(r.result)
-    #Lookup Vendor OUI from MAC
-    vendor_mactable = defaultdict(list)
-    interfaces = defaultdict(list)
-
-    #Create dictionary of interfaces and the vendor MACs that are attached.
-    for key in r.result['mac_address_table']:
-        if not key['interface']:
-            continue
-
-        try:
-            vendor = macQ.lookup(key['mac'])
-        except:
-            vendor = "Unknown"
-
-        #print(key['mac'], 'EQUALS > ', vendor, 'ON INTERFACE > ', key['interface'])
-        vendor_mactable[key['interface']].append(vendor)
-
-    #From VendorMacTable dictionary, create new list of interfaces that have multiple MACs.
-    #Add to Exclusion List
-    for iface, value in vendor_mactable.items():
-        #print(iface, value)
-        if len(value) > 1:
-            #print(iface, '>', value)
-            interfaces[iface].extend(value)
-
-    print('----- Resolved Vendor MAC Table ----- \n', vendor_mactable)
-    print('----- Multi Host Interfaces ----- \n', interfaces)
-
-    task.host['vendormactable'] = vendor_mactable
-    task.host['multimacinterfaces'] = interfaces
-    #return task.host['exlcusions'][vendor_mactable, interfaces]
-    info = {'multimacports': dict(interfaces), 'vendormactable': dict(vendor_mactable)}
-    return info
-"""
-""" DELETE
-def get_interfaces(task):
-    r = task.run(networking.napalm_get, getters=['interfaces'], name="Get Interfaces")
-    # save our values in to the Key 'neighbors'
-    task.host['interfaces'] = r.result
-    #loop through the neighbors
-    print(task.host['interfaces'])
-    #print('-'*10, task.host, '-', task.host.hostname, '-'*10)
-"""
-
-def get_mac_table_napalm(task):
-    task.run(name="Get Mac Table Napalm", task=napalm_get, getters=["mac_address_table"])
-    return "Get Mac Table Complete"
-
-def get_facts(task):
-    task.run(name="Get facts", task=napalm_get, getters=["facts"])
-    return "Get Facts Complete"
-
-def get_lldp_neighbors(task):
-    task.run(name="Get LLDP neighbors", task=napalm_get, getters=["lldp_neighbors_detail"])
-    return "Get LLDP Neighbors Complete"
-
-def get_interfaces(task):
-    task.run(name="Get Interfaces", task=napalm_get, getters=["interfaces"])
-    return "get Interfaces Complete"
-
-def get_vlans(task):
-    task.run(name="Get VLANs", task=napalm_get, getters=["vlans"])
-    return "get VLANs Complete"
 
 """
 Run the main function to pull device information and create the workbook.
 """
 create_workbook()
-print("Workbook Created")
+print("\nWorkbook Created")
