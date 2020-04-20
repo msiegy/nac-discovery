@@ -54,8 +54,8 @@ def create_workbook():
     """
     nr = InitNornir(config_file="config.yaml", core={"raise_on_error": False})
     #accessHosts = nr.filter(hostname='10.83.8.163')
-    accessHosts = nr.filter(site='herndon-dev')
-    #accessHosts = nr.filter(type='network_device')
+    #accessHosts = nr.filter(site='herndon-dev')
+    accessHosts = nr.filter(type='network_device')
     #accessHosts = nr.filter(role='FIAB')
 
     #Initialize nested dictionary for tracking recomended ports and reasoning to exclude from NAC.
@@ -259,12 +259,16 @@ def create_workbook():
 
     if nr.data.failed_hosts:
         print("The following switches failed during a task and were not added to the workbook:", nr.data.failed_hosts)
+    #TODO: save failed switches to worksheet
 
     wb.remove(wb["Sheet"])
-    wb.save(wb_name)
-
+    #catch potential save errors on workbook.
+    try:
+        wb.save(wb_name)
+        print("\nWorkbook Created")
+    except Exception as e:
+        print("\n######", e , "######\nFailed to Save workbook, please close it if open and ensure you have access to save location")
 """
 Run the main function to pull device information and create the workbook.
 """
 create_workbook()
-print("\nWorkbook Created")
