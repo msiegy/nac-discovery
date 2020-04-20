@@ -8,6 +8,9 @@ Built using the opensource Nornir and Napalm Python libraries. Nornir inventory 
 *Local modification of mac_vendor_lookup library required to handle cisco MAC formatting. PR planned*
 
 
+![](nac-discovery-run.gif)
+
+
   TODO:
   - Add workbook sheet to list any switches that failed during collection
   - Add function to create dynamic Nornir inventory .yaml files based on external source using installed location etc as input 
