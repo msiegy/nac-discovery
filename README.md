@@ -19,6 +19,7 @@ Built using the opensource Nornir and Napalm Python libraries. Nornir inventory 
   - improve interface normalization and move to function to handle discrepancies between napalm getters and interface names.
   - move description keywords to variable at top and/or provide --flag for input at CLI
   - Add exclusion based on Switchport mode vs Routed mode
+  - Refactor and explore streamlining all napalm getters into a single task.
 
 
 # iosnacconfparser.py
