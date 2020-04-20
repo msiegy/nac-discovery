@@ -12,8 +12,10 @@ Built using the opensource Nornir and Napalm Python libraries. Nornir inventory 
   - Add workbook sheet to list any switches that failed during collection
   - Add function to create dynamic Nornir inventory .yaml files based on external source using installed location etc as input 
   - Add logging function and output to execution logfile
+  - Add passkey() or similar functionality for handling login credentials in production environments
   - improve interface normalization and move to function to handle discrepancies between napalm getters and interface names.
   - move description keywords to variable at top and/or provide --flag for input at CLI
+  - Add exclusion based on Switchport mode vs Routed mode
 
 
 # iosnacconfparser.py
