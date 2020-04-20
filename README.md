@@ -8,10 +8,18 @@ Built using the opensource Nornir and Napalm Python libraries. Nornir inventory 
 *Local modification of mac_vendor_lookup library required to handle cisco MAC formatting. PR planned*
 
 
+  TODO:
+  - Add workbook sheet to list any switches that failed during collection
+  - Add function to create dynamic Nornir inventory .yaml files based on external source using installed location etc as input 
+  - Add logging function and output to execution logfile
+  - improve interface normalization and move to function to handle discrepancies between napalm getters and interface names.
+  - move description keywords to variable at top and/or provide --flag for input at CLI
+
+
 # iosnacconfparser.py
 A Separate project which uses a switch configuration file parser and the python library ciscoconfparse for identifying where to apply appropriate NAC configs and then generates those configs for deployment. 
 
 iosparser.py """ Iterates Cisco IOS configuration files in a directory to return a list of interfaces that contain relevant children statements. From this list generate configuration files that include NAC changes. One file for complete configuration and one file for new changes only. Today the script considers the following: Switchport mode access, shutdown status and description keywords as whether to apply NAC commands."""
 
 
-Both scrips were tested with Catalyst 9300/9500 switches running XE 16.6 and 16.8, but should run on most ios versions.
+Both scripts were tested with Catalyst 9300/9500 switches running XE 16.6 and 16.8, but should run on most ios versions.
