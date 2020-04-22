@@ -23,7 +23,6 @@ import openpyxl
 from openpyxl.styles import Font
 import re
 import time
-from nornir.core.deserializer.inventory import InventoryElement
 
 def create_workbook():
     """
@@ -272,7 +271,7 @@ def create_workbook():
         for host in nr.data.failed_hosts:
             error = napalm_results[host][0].exception
             #print(procurve_devices.inventory.hosts[host].keys())
-            hostname = procurve_devices.inventory.get_hosts_dict()[host]['hostname'])
+            hostname = procurve_devices.inventory.get_hosts_dict()[host]['hostname']
             line = [host, hostname, str(error)]
             devicefailures_ws.append(line)
 
