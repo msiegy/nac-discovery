@@ -55,7 +55,7 @@ def create_workbook():
     portexclusions_ws.append(['Switch', 'Interface', 'Reason', 'Port Description'])
 
     devicefailures_ws = wb.create_sheet("Failed Devices")
-    devicefailures_ws.append(['Switch', 'Error'])
+    devicefailures_ws.append(['Switch', 'Hostname', 'Error'])
 
     """
     Initialize Nornir settings and set the right inventory targets and filters
