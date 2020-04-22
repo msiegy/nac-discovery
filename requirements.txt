@@ -1,5 +1,6 @@
 mac-vendor-lookup
 napalm
+napalm-procurve
 nornir
 openpyxl
 ciscoconfparse

@@ -54,9 +54,11 @@ def create_workbook():
     """
     nr = InitNornir(config_file="config.yaml", core={"raise_on_error": False})
     #accessHosts = nr.filter(hostname='10.83.8.163')
-    #accessHosts = nr.filter(site='herndon-dev')
-    accessHosts = nr.filter(type='network_device')
+    accessHosts = nr.filter(site='herndon-dev')
+    #accessHosts = nr.filter(type='network_device')
     #accessHosts = nr.filter(role='FIAB')
+    #accessHosts = nr.filter(site='home')
+
 
     #Initialize nested dictionary for tracking recomended ports and reasoning to exclude from NAC.
     portexclusions = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
@@ -189,6 +191,9 @@ def create_workbook():
                 elif re.search('TwoGigabit', str(interface), re.IGNORECASE):
                     digits = re.search('([0-9]*\/?[0-9]*\/?[0-9]*$)', str(interface))
                     interface = 'Tw' + digits.group()
+                elif re.search('^Gigabit', str(interface), re.IGNORECASE):
+                    digits = re.search('([0-9]*\/?[0-9]*\/?[0-9]*$)', str(interface))
+                    interface = 'Gi' + digits.group()
 
                 portexclusions[host][interface]['reason'].append('LLDP Neighbor' + str(remotecapability))
                 #print(host, interface, remotecapability)
@@ -231,6 +236,9 @@ def create_workbook():
                 elif re.search('TwoGigabit', str(interface), re.IGNORECASE):
                     digits = re.search('([0-9]*\/?[0-9]*\/?[0-9]*$)', str(interface))
                     interface = 'Tw' + digits.group()
+                elif re.search('^Gigabit', str(interface), re.IGNORECASE):
+                    digits = re.search('([0-9]*\/?[0-9]*\/?[0-9]*$)', str(interface))
+                    interface = 'Gi' + digits.group()
 
                 reasondescript = 'Description contains: ' + keyword.group()
                 portexclusions[host][interface]['reason'].append(reasondescript)
@@ -254,7 +262,7 @@ def create_workbook():
     """
     Get VLANs... in Napalm-automation:develop train, needed for identifying switchport mode trunk.
     """
-    #vlans = accessHosts.run(task=get_vlans, name="Get VLANs")
+    #vlans = accessHosts.run(task=napalm_get, getters=['vlan'], name="Get VLANs")
     #print_result(vlans)
 
     if nr.data.failed_hosts:
@@ -268,6 +276,17 @@ def create_workbook():
         print("\nWorkbook Created")
     except Exception as e:
         print("\n######", e , "######\nFailed to Save workbook, please close it if open and ensure you have access to save location")
+
+"""Password Handler to avoid storing credentials in the clear inside inventory files."""
+def nornir_set_creds(norn, username=None, password=None):
+    if not username:
+        username = input("Enter username: ")
+    if not password:
+        password = getpass()
+
+    for host_obj in norn.inventory.hosts.values():
+        host_obj.username = username
+        host_obj.password = password
 """
 Run the main function to pull device information and create the workbook.
 """
