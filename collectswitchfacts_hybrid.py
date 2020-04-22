@@ -23,6 +23,7 @@ import openpyxl
 from openpyxl.styles import Font
 import re
 import time
+from nornir.core.deserializer.inventory import InventoryElement
 
 def create_workbook():
     """
@@ -270,7 +271,9 @@ def create_workbook():
         print("The following switches failed during a task and were not added to the workbook:", nr.data.failed_hosts)
         for host in nr.data.failed_hosts:
             error = napalm_results[host][0].exception
-            line = [host, str(error)]
+            #print(procurve_devices.inventory.hosts[host].keys())
+            hostname = procurve_devices.inventory.get_hosts_dict()[host]['hostname'])
+            line = [host, hostname, str(error)]
             devicefailures_ws.append(line)
 
     wb.remove(wb["Sheet"])
