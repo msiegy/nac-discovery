@@ -21,17 +21,28 @@ from mac_vendor_lookup import MacLookup
 from collections import defaultdict
 import openpyxl
 from openpyxl.styles import Font
+import pathlib
 import re
 import time
+import datetime as dt
 
 def create_workbook():
     """
     Create an Excel workbook to store values retrieved from switches
     """
 
+    #Setup logfile and naming based on date/time. Create directory if needed.
+    current_time = dt.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") 
+    log_dir = "logs"
+    pathlib.Path(log_dir).mkdir(exist_ok=True)
+    filename = str("DISCOVERY-LOG") + "-" + current_time + ".txt"
+    log_filepath = log_dir + "/" + filename
+    # Create the log file
+    logfile = open(log_filepath, "w")
+
     wb = openpyxl.Workbook()
     groupname = "MixGrouping1" #TODO: Replace with function that takes list of location codes.
-    wb_name = "MultiDev-NACFACTS -" + groupname + ".xlsx"
+    wb_name = "NACFACTS-" + groupname + "-" + current_time + ".xlsx"
 
 
     #Create sheets and column headers
@@ -60,22 +71,20 @@ def create_workbook():
     Initialize Nornir settings and set the right inventory targets and filters
     """
     nr = InitNornir(config_file="config.yaml", core={"raise_on_error": False})
-    #procurve_devices = nr.filter(hostname='10.83.8.163')
-    #procurve_devices = nr.filter(site='herndon-dev')
-    #procurve_devices = nr.filter(type='network_device')
-    #procurve_devices = nr.filter(site='Home')
-    procurve_devices = nr.filter(tag='mix')
-    #access_devices = nr.filter(type='home')
+    #target_devices = nr.filter(hostname='10.83.8.163')
+    target_devices = nr.filter(site='herndon-dev')
+    #target_devices = nr.filter(tag='mix')
 
     #Initialize nested dictionary for tracking recomended ports and reasoning to exclude from NAC.
     portexclusions = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     #portexclusions = {'SwitchName': {'Gi1/1:' {'description': 'trunk to mdf', macvendor: 'VMWare', Reasoning: ['Port is trunk', 'multimacs'] }}
 
-    print('Collecting information from the following Nornir inventory hosts:', procurve_devices.inventory.hosts.keys())
+    print('Collecting information from the following Nornir inventory hosts:', target_devices.inventory.hosts.keys())
+    logfile.write('Collecting information from the following Nornir inventory hosts:' + str(target_devices.inventory.hosts.keys()) + '\n')
 
     print("Grabbing Data With Nornir/Napalm - Start Clock\n")
     starttime = time.perf_counter()
-    napalm_results = procurve_devices.run(task=napalm_get, getters=['mac_address_table', 'facts', 'lldp_neighbors_detail', 'interfaces'], name="Get Switch info: Facts, MAC Table, LLDP, and Interfaces")
+    napalm_results = target_devices.run(task=napalm_get, getters=['mac_address_table', 'facts', 'lldp_neighbors_detail', 'interfaces'], name="Get Switch info: Facts, MAC Table, LLDP, and Interfaces")
     stoptime = time.perf_counter()
     print(f"Done Grabbing Data\n Execution took: {stoptime - starttime:0.4f} seconds")
 
@@ -83,9 +92,11 @@ def create_workbook():
         #Check for switches that failed and continue. Nornir automatically removes failed devices from future tasks.
         if task_results.failed:
             print(' ######', '\n!Failed Host in task_results:>', host, 'will be removed from future tasks!\n', '######', '\n')
+            logfile.write('!Failed Host in task_results:> ' + host + ' will be removed from future tasks!\n')
             continue
-        print("Start processing Host :", str(host), '\n')
-        #print("Task_results are:>\n", task_results)
+        print("Start processing Host - ", str(host), '\n')
+        logfile.write('Start processing Host - ' + str(host) + '\n')
+
         facts_result = task_results[0].result['facts']
         #print("Facts_Results are:> (task_results[0].result['facts'] >>\n)", facts_result)
         lldp_result = task_results[0].result['lldp_neighbors_detail']
@@ -99,8 +110,9 @@ def create_workbook():
         macQ = MacLookup()
         #loop through each switch in the Nornir Task Result object
         print("Start processing Host - Mac_Results:", str(host), '\n')
+        logfile.write("Start processing Host - Mac_Results: " + str(host) + '\n')
 
-        #unnecessary sicne captured above?
+        #unnecessary since captured above?
         if task_results.failed:
             print(' ######', '\n!Failed Host in task_results (MACTABLE):>', host, 'will be removed from future tasks!\n', '######', '\n')
             continue
@@ -124,7 +136,6 @@ def create_workbook():
 
             #Store relevant values for worksheet row and append to sheet.
             line = [host, interface_value, mac_value, vendor_value]
-            print('mactable lookup line:', line)
             mactablevendor_ws.append(line)
             #Append Vendor lookup results to vendor_mactable so we can use them for port exclusion recommendations.
             vendor_mactable[entry['interface']].append(vendor_value)
@@ -137,13 +148,13 @@ def create_workbook():
                 interfaces[iface].extend(value)
 
                 line = [host, iface, len(interfaces[iface]), str(interfaces[iface])]
-                print('multimac line:', line)
                 multimacports_ws.append(line)
                 #Append to portexlcusions dictionary
                 portexclusions[host][iface]['reason'].append('multimac')
         #print('vendor mactable\n\n', vendor_mactable)
         #print('interfact dict \n\n', interfaces)
         print("End Processing Host - Mac_Results: " + str(host) + "\n")
+        logfile.write("End Processing Host - Mac_Results: " + str(host) + "\n")
 
         """
         Get Facts  from all inventory targets using nornir napalm
@@ -152,6 +163,7 @@ def create_workbook():
 
 
         print("Start processing Host - Get Facts:", str(host), '\n')
+        logfile.write("Start processing Host - Get Facts: " + str(host) + '\n')
 
         hostname_result = facts_result['hostname']
         vendor_result = facts_result['vendor']
@@ -164,16 +176,16 @@ def create_workbook():
             interfacelist_result = facts_result['interface_list']
 
         line = [host, vendor_result, model_result, version_result, serial_result, uptime_result]
-        print('Facts line:', line)
-        print(interfacelist_result)
 
         facts_ws.append(line)
         print("End Processing Host - Get Facts: " + str(host) + "\n")
+        logfile.write("End Processing Host - Get Facts: " + str(host) + "\n")
 
 
         """PROCESS LLDP NEIGHBOR DETAIL RESULTS - ."""
 
         print("Start processing Host - Get LLDP Neighbors:", str(host), '\n')
+        logfile.write("Start processing Host - Get LLDP Neighbors: " + str(host) + '\n')
         for interface in lldp_result:
             #print(lldp_detail)
 
@@ -189,7 +201,6 @@ def create_workbook():
                 remotevendor = "Unknown"
 
             line = [host, interface, remotesysid, remotesysname, remotesysdescription, remoteportid, remoteportdesc, str(remotecapability), remotevendor]
-            print('lldp neighbor line::', line)
             lldpneighbor_ws.append(line)
 
             if ('router' in remotecapability) or ('bridge' in remotecapability):
@@ -208,12 +219,13 @@ def create_workbook():
                 #print(host, interface, remotecapability)
 
         print("End Processing Host - Get LLDP Neighors: " + str(host) + "\n")
-
+        logfile.write("End Processing Host - Get LLDP Neighors: " + str(host) + "\n")
 
         """
         Get Interfaces, check descriptions for keywords and append to port exclusions.
         """
         print("Start processing Host - Get Interfaces:", str(host), '\n')
+        logfile.write("Start processing Host - Get Interfaces: " + str(host) + '\n')
 
         for interface in interfaces_result:
             #if 'C9500-16X' in host:
@@ -225,7 +237,6 @@ def create_workbook():
             speed = interfaces_result[interface]['speed']
 
             line = [host, interface_id, description, adminstatus, operstatus, speed]
-            print('Interfaces line:', line)
 
             interfaces_ws.append(line)
 
@@ -250,6 +261,7 @@ def create_workbook():
                 portexclusions[host][interface]['description']= str(description)
 
         print("End processing Host - Get Interfaces:", str(host), '\n')
+        logfile.write("End processing Host - Get Interfaces: " + str(host) + '\n')
 
 
         """
@@ -258,20 +270,22 @@ def create_workbook():
         """
         for host, value in portexclusions.items():
             print("Start processing Host - Port Exclusions:", str(host), '\n')
-            #print(host)
+            logfile.write("Start processing Host - Port Exclusions: " + str(host) + '\n')
+
             for interface in portexclusions[host]:
                 line = [host, interface, str(portexclusions[host][interface]['reason']), str(portexclusions[host][interface]['description'])]
-                print("Port Exclusions line:", line)
                 portexclusions_ws.append(line)
             print("End processing Host - Port Exclusions:", str(host), '\n')
+            logfile.write("End processing Host - Port Exclusions: " + str(host) + '\n')
 
     #check if there are any failed hosts and save failed switches to worksheet
     if nr.data.failed_hosts:
-        print("The following switches failed during a task and were not added to the workbook:", nr.data.failed_hosts)
+        print("The following switches failed during a task and were not added to the workbook:", nr.data.failed_hosts, '\n')
+        logfile.write("The following switches failed during a task and were not added to the workbook: " + str(nr.data.failed_hosts) + '\n')
         for host in nr.data.failed_hosts:
             error = napalm_results[host][0].exception
-            #print(procurve_devices.inventory.hosts[host].keys())
-            hostname = procurve_devices.inventory.get_hosts_dict()[host]['hostname']
+            #print(target_devices.inventory.hosts[host].keys())
+            hostname = target_devices.inventory.get_hosts_dict()[host]['hostname']
             line = [host, hostname, str(error)]
             devicefailures_ws.append(line)
 
@@ -279,9 +293,11 @@ def create_workbook():
     #catch potential save errors on workbook.
     try:
         wb.save(wb_name)
-        print("\nWorkbook Created")
+        print("Workbook -", wb_name, "- Created")
+        logfile.write("Workbook - " + wb_name + " Created\n")
     except Exception as e:
         print("\n######", e , "######\nFailed to Save workbook, please close it if open and ensure you have access to save location")
+    logfile.close()
 """
 Run the main function to pull device information and create the workbook.
 """
