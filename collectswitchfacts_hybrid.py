@@ -32,7 +32,7 @@ def create_workbook():
     """
 
     #Setup logfile and naming based on date/time. Create directory if needed.
-    current_time = dt.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") 
+    current_time = dt.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     log_dir = "logs"
     pathlib.Path(log_dir).mkdir(exist_ok=True)
     filename = str("DISCOVERY-LOG") + "-" + current_time + ".txt"
@@ -44,6 +44,8 @@ def create_workbook():
     groupname = "MixGrouping1" #TODO: Replace with function that takes list of location codes.
     wb_name = "NACFACTS-" + groupname + "-" + current_time + ".xlsx"
 
+    #Define the regex keywords that we want to look for in interface descriptions
+    desc_keywords = "(ASR|ENCS|UPLINK|CIRCUIT|ISP|SWITCH|TRUNK|ESXI|VMWARE)"
 
     #Create sheets and column headers
     facts_ws = wb.create_sheet("Facts")
@@ -81,6 +83,7 @@ def create_workbook():
 
     print('Collecting information from the following Nornir inventory hosts:', target_devices.inventory.hosts.keys())
     logfile.write('Collecting information from the following Nornir inventory hosts:' + str(target_devices.inventory.hosts.keys()) + '\n')
+    logfile.write('Interesting Interface keywords: ' + desc_keywords + '\n')
 
     print("Grabbing Data With Nornir/Napalm - Start Clock\n")
     starttime = time.perf_counter()
@@ -242,7 +245,7 @@ def create_workbook():
 
             #Check for Exclusion keywords and add interfaces to portexclusion dictionary then append to portexlusion_ws.
             #TODO: Replace search literals with variable at top for quicker modification.
-            keyword = re.search('(ASR|ENCS|UPLINK|CIRCUIT|ISP|SWITCH|TRUNK|ESXI|VMWARE)', str(description), re.IGNORECASE)
+            keyword = re.search(desc_keywords, str(description), re.IGNORECASE)
             if keyword:
                 #Normalize Interface names because different napalm getters return full interfaces name and some return shortened names which result in multiple dictionary keys being created.
                 #TODO: generalize for all interfaces and move to function
