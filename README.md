@@ -12,12 +12,12 @@ Built using the opensource Nornir and Napalm Python libraries. Nornir inventory 
   TODO:
   - Add function to create dynamic Nornir inventory .yaml files based on external source using installed location etc as input 
   - Add logging function and output to execution logfile
-  - Add passkey() or similar functionality for handling login credentials in production environments
+  - Add getpass() or similar functionality for handling login credentials in production environments
   - improve interface normalization and move to function to handle discrepancies between napalm getters and interface names.
   - move description keywords to variable at top and/or provide --flag for input at CLI
   - Add exclusion based on Switchport mode vs Routed mode
   - Refactor and explore streamlining all napalm getters into a single task.
-
+  - Add function to export and save running/saved configurations
 
 # iosnacconfparser.py
 A Separate project which uses a switch configuration file parser and the python library ciscoconfparse for identifying where to apply appropriate NAC configs and then generates those configs for deployment. 
